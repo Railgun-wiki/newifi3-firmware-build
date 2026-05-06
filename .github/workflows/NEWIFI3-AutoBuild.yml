@@ -17,6 +17,11 @@ on:
   #   - cron: '0 5 * * 0'
   repository_dispatch:
   workflow_dispatch:
+    inputs:
+      plugin_source:
+        description: '插件源码地址 (可选, 例如 https://github.com/xxx/yyy)'
+        required: false
+        default: ''
 
 env:
   REPO_URL: https://github.com/openwrt/openwrt
@@ -66,6 +71,11 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
+    - name: Clone custom plugin
+      if: github.event.inputs.plugin_source != ''
+      run: |
+        git clone ${{ github.event.inputs.plugin_source }} openwrt/package/custom_plugin
+
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
@@ -79,6 +89,32 @@ jobs:
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+        
+        # 强制开启用户要求的 kmod 和工具包并设为模块模式
+        echo "CONFIG_PACKAGE_kmod-tun=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-ipt-tproxy=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-netem=m" >> .config
+        echo "CONFIG_PACKAGE_kmod-ipt-ipset=m" >> .config
+        echo "CONFIG_PACKAGE_iptables-mod-tproxy=m" >> .config
+        echo "CONFIG_PACKAGE_ipset=m" >> .config
+
+    - name: Select custom plugin as module
+      if: github.event.inputs.plugin_source != ''
+      run: |
+        cd openwrt
+        # 寻找 package/custom_plugin 目录下的所有 Makefile 并提取包名
+        find package/custom_plugin -name "Makefile" | while read m; do
+          PKG=$(grep -E '^PKG_NAME:=' "$m" | cut -d'=' -f2 | tr -d ' \t\r\n')
+          # 处理可能存在的 $(NAME) 变量替换（简单兼容）
+          if [[ "$PKG" == *"\$(NAME)"* ]]; then
+            NAME=$(grep -E '^NAME:=' "$m" | cut -d'=' -f2 | tr -d ' \t\r\n')
+            PKG=${PKG//\$(NAME)/$NAME}
+          fi
+          if [ -n "$PKG" ]; then
+            echo "发现插件包: $PKG，已设为模块编译"
+            echo "CONFIG_PACKAGE_$PKG=m" >> .config
+          fi
+        done
 
     - name: Download package
       id: package
@@ -99,6 +135,22 @@ jobs:
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+    - name: Collect and Upload IPKs
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        mkdir -p custom_ipks
+        # 收集所有生成的 .ipk 文件 (包含插件及其依赖)
+        find openwrt/bin/ -name "*.ipk" -exec cp -f {} custom_ipks/ \;
+        echo "已收集的 IPK 列表:"
+        ls -l custom_ipks/
+
+    - name: Upload IPKs Artifact
+      uses: actions/upload-artifact@main
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_IPKs${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: custom_ipks/
 
     - name: Check space usage
       if: (!cancelled())
