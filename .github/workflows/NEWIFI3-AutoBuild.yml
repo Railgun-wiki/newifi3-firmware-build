@@ -90,13 +90,21 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         
-        # 强制开启用户要求的 kmod 和工具包并设为模块模式
-        echo "CONFIG_PACKAGE_kmod-tun=m" >> .config
-        echo "CONFIG_PACKAGE_kmod-ipt-tproxy=m" >> .config
-        echo "CONFIG_PACKAGE_kmod-netem=m" >> .config
-        echo "CONFIG_PACKAGE_kmod-ipt-ipset=m" >> .config
-        echo "CONFIG_PACKAGE_iptables-mod-tproxy=m" >> .config
-        echo "CONFIG_PACKAGE_ipset=m" >> .config
+        # 强制开启用户要求的 kmod 和工具包并设为模块模式 (使用 sed 确保覆盖旧配置)
+        sed -i 's/# CONFIG_PACKAGE_kmod-tun is not set/CONFIG_PACKAGE_kmod-tun=m/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-ipt-tproxy is not set/CONFIG_PACKAGE_kmod-ipt-tproxy=m/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-netem is not set/CONFIG_PACKAGE_kmod-netem=m/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-ipt-ipset is not set/CONFIG_PACKAGE_kmod-ipt-ipset=m/g' .config
+        sed -i 's/# CONFIG_PACKAGE_iptables-mod-tproxy is not set/CONFIG_PACKAGE_iptables-mod-tproxy=m/g' .config
+        sed -i 's/# CONFIG_PACKAGE_ipset is not set/CONFIG_PACKAGE_ipset=m/g' .config
+        
+        # 如果原本就不存在这些行，则追加（双重保险）
+        grep -q "CONFIG_PACKAGE_kmod-tun=" .config || echo "CONFIG_PACKAGE_kmod-tun=m" >> .config
+        grep -q "CONFIG_PACKAGE_kmod-ipt-tproxy=" .config || echo "CONFIG_PACKAGE_kmod-ipt-tproxy=m" >> .config
+        grep -q "CONFIG_PACKAGE_kmod-netem=" .config || echo "CONFIG_PACKAGE_kmod-netem=m" >> .config
+        grep -q "CONFIG_PACKAGE_kmod-ipt-ipset=" .config || echo "CONFIG_PACKAGE_kmod-ipt-ipset=m" >> .config
+        grep -q "CONFIG_PACKAGE_iptables-mod-tproxy=" .config || echo "CONFIG_PACKAGE_iptables-mod-tproxy=m" >> .config
+        grep -q "CONFIG_PACKAGE_ipset=" .config || echo "CONFIG_PACKAGE_ipset=m" >> .config
 
     - name: Select custom plugin as module
       if: github.event.inputs.plugin_source != ''
