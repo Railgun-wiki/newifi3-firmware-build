@@ -111,6 +111,15 @@ jobs:
         echo "CONFIG_PACKAGE_minieap=y" >> .config
         echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
         echo "CONFIG_PACKAGE_ttyd=y" >> .config
+        
+        # 补齐用户要求的全量工具依赖
+        echo "CONFIG_PACKAGE_curl=y" >> .config
+        echo "CONFIG_PACKAGE_wget-ssl=y" >> .config
+        echo "CONFIG_PACKAGE_ip-full=y" >> .config
+        echo "CONFIG_PACKAGE_net-tools-ifconfig=y" >> .config
+        echo "CONFIG_PACKAGE_net-tools-route=y" >> .config
+        echo "CONFIG_PACKAGE_net-tools-netstat=y" >> .config
+        
         # 设置 Argon 为默认主题
         echo "CONFIG_PACKAGE_luci-theme-bootstrap=n" >> .config
         echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
