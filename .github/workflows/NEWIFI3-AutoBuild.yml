@@ -72,9 +72,17 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Clone custom plugin
-      if: github.event.inputs.plugin_source != ''
       run: |
-        git clone ${{ github.event.inputs.plugin_source }} openwrt/package/custom_plugin
+        # 克隆 MiniEAP 相关包
+        git clone https://github.com/kongfl888/luci-app-minieap openwrt/package/luci-app-minieap
+        git clone https://github.com/undefined443/openwrt-minieap-sysu openwrt/package/minieap-sysu
+        # 克隆 Argon 主题 (适配 21.02 版本)
+        git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon openwrt/package/luci-theme-argon
+        
+        # 如果手动输入了插件地址，依然保留克隆逻辑
+        if [ "${{ github.event.inputs.plugin_source }}" != "" ]; then
+          git clone ${{ github.event.inputs.plugin_source }} openwrt/package/custom_plugin
+        fi
 
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
@@ -97,6 +105,12 @@ jobs:
         sed -i 's/# CONFIG_PACKAGE_kmod-ipt-ipset is not set/CONFIG_PACKAGE_kmod-ipt-ipset=y/g' .config
         sed -i 's/# CONFIG_PACKAGE_iptables-mod-tproxy is not set/CONFIG_PACKAGE_iptables-mod-tproxy=y/g' .config
         sed -i 's/# CONFIG_PACKAGE_ipset is not set/CONFIG_PACKAGE_ipset=y/g' .config
+        
+        # 强制开启新增的 MiniEAP、主题和 ttyd
+        echo "CONFIG_PACKAGE_luci-app-minieap=y" >> .config
+        echo "CONFIG_PACKAGE_minieap=y" >> .config
+        echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
+        echo "CONFIG_PACKAGE_ttyd=y" >> .config
         
         # 如果原本就不存在这些行，则追加（双重保险）
         grep -q "CONFIG_PACKAGE_kmod-tun=" .config || echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
