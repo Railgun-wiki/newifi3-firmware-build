@@ -98,7 +98,7 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         
-        # 强制开启用户要求的 kmod 和工具包并直接编译进固件 (使用 =y)
+        # 使用 sed 强制开启所有核心组件和用户插件 (解决配置冲突)
         sed -i 's/# CONFIG_PACKAGE_kmod-tun is not set/CONFIG_PACKAGE_kmod-tun=y/g' .config
         sed -i 's/# CONFIG_PACKAGE_kmod-ipt-tproxy is not set/CONFIG_PACKAGE_kmod-ipt-tproxy=y/g' .config
         sed -i 's/# CONFIG_PACKAGE_kmod-netem is not set/CONFIG_PACKAGE_kmod-netem=y/g' .config
@@ -106,29 +106,37 @@ jobs:
         sed -i 's/# CONFIG_PACKAGE_iptables-mod-tproxy is not set/CONFIG_PACKAGE_iptables-mod-tproxy=y/g' .config
         sed -i 's/# CONFIG_PACKAGE_ipset is not set/CONFIG_PACKAGE_ipset=y/g' .config
         
-        # 强制开启新增的 MiniEAP、主题和 ttyd (设置为主选包)
-        echo "CONFIG_PACKAGE_luci-app-minieap=y" >> .config
-        echo "CONFIG_PACKAGE_minieap=y" >> .config
-        echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
-        echo "CONFIG_PACKAGE_ttyd=y" >> .config
+        # 开启 MiniEAP、主题、TTYD 和全量工具依赖
+        sed -i 's/# CONFIG_PACKAGE_luci-app-minieap is not set/CONFIG_PACKAGE_luci-app-minieap=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_minieap is not set/CONFIG_PACKAGE_minieap=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_luci-theme-argon is not set/CONFIG_PACKAGE_luci-theme-argon=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_ttyd is not set/CONFIG_PACKAGE_ttyd=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_curl is not set/CONFIG_PACKAGE_curl=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_wget-ssl is not set/CONFIG_PACKAGE_wget-ssl=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_ip-full is not set/CONFIG_PACKAGE_ip-full=y/g' .config
         
-        # 补齐用户要求的全量工具依赖
-        echo "CONFIG_PACKAGE_curl=y" >> .config
-        echo "CONFIG_PACKAGE_wget-ssl=y" >> .config
-        echo "CONFIG_PACKAGE_ip-full=y" >> .config
-        echo "CONFIG_PACKAGE_net-tools-ifconfig=y" >> .config
-        echo "CONFIG_PACKAGE_net-tools-route=y" >> .config
-        echo "CONFIG_PACKAGE_net-tools-netstat=y" >> .config
+        # 补齐 leigod.sh 专用依赖包
+        sed -i 's/# CONFIG_PACKAGE_libpcap is not set/CONFIG_PACKAGE_libpcap=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_tc-full is not set/CONFIG_PACKAGE_tc-full=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_conntrack is not set/CONFIG_PACKAGE_conntrack=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_luci-app-upnp is not set/CONFIG_PACKAGE_luci-app-upnp=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_miniupnpd is not set/CONFIG_PACKAGE_miniupnpd=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-ipt-nat is not set/CONFIG_PACKAGE_kmod-ipt-nat=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_iptables is not set/CONFIG_PACKAGE_iptables=y/g' .config
+
+        # 兜底追加 (包含新增的 ca-bundle 和 kmod-sched)
+        for pkg in kmod-tun kmod-ipt-tproxy kmod-netem kmod-ipt-ipset iptables-mod-tproxy ipset \
+                   luci-app-minieap minieap luci-theme-argon ttyd curl wget-ssl ip-full \
+                   libpcap tc-full conntrack luci-app-upnp miniupnpd kmod-ipt-nat iptables \
+                   kmod-sched kmod-sched-core ca-bundle \
+                   luci-i18n-upnp-zh-cn luci-i18n-ttyd-zh-cn \
+                   net-tools-ifconfig net-tools-route net-tools-netstat; do
+            grep -q "CONFIG_PACKAGE_$pkg=" .config || echo "CONFIG_PACKAGE_$pkg=y" >> .config
+        done
         
         # 设置 Argon 为默认主题
-        echo "CONFIG_PACKAGE_luci-theme-bootstrap=n" >> .config
+        sed -i 's/CONFIG_PACKAGE_luci-theme-bootstrap=y/CONFIG_PACKAGE_luci-theme-bootstrap=n/g' .config
         echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
-        
-        # 确保基础依赖存在 (双重保险)
-        grep -q "CONFIG_PACKAGE_kmod-tun=" .config || echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
-        grep -q "CONFIG_PACKAGE_kmod-ipt-tproxy=" .config || echo "CONFIG_PACKAGE_kmod-ipt-tproxy=y" >> .config
-        grep -q "CONFIG_PACKAGE_kmod-ipt-ipset=" .config || echo "CONFIG_PACKAGE_kmod-ipt-ipset=y" >> .config
-        grep -q "CONFIG_PACKAGE_ipset=" .config || echo "CONFIG_PACKAGE_ipset=y" >> .config
 
     - name: Select custom plugin as module
       if: github.event.inputs.plugin_source != ''
