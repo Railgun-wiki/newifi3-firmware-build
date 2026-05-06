@@ -106,18 +106,19 @@ jobs:
         sed -i 's/# CONFIG_PACKAGE_iptables-mod-tproxy is not set/CONFIG_PACKAGE_iptables-mod-tproxy=y/g' .config
         sed -i 's/# CONFIG_PACKAGE_ipset is not set/CONFIG_PACKAGE_ipset=y/g' .config
         
-        # 强制开启新增的 MiniEAP、主题和 ttyd
+        # 强制开启新增的 MiniEAP、主题和 ttyd (设置为主选包)
         echo "CONFIG_PACKAGE_luci-app-minieap=y" >> .config
         echo "CONFIG_PACKAGE_minieap=y" >> .config
         echo "CONFIG_PACKAGE_luci-theme-argon=y" >> .config
         echo "CONFIG_PACKAGE_ttyd=y" >> .config
+        # 设置 Argon 为默认主题
+        echo "CONFIG_PACKAGE_luci-theme-bootstrap=n" >> .config
+        echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
         
-        # 如果原本就不存在这些行，则追加（双重保险）
+        # 确保基础依赖存在 (双重保险)
         grep -q "CONFIG_PACKAGE_kmod-tun=" .config || echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
         grep -q "CONFIG_PACKAGE_kmod-ipt-tproxy=" .config || echo "CONFIG_PACKAGE_kmod-ipt-tproxy=y" >> .config
-        grep -q "CONFIG_PACKAGE_kmod-netem=" .config || echo "CONFIG_PACKAGE_kmod-netem=y" >> .config
         grep -q "CONFIG_PACKAGE_kmod-ipt-ipset=" .config || echo "CONFIG_PACKAGE_kmod-ipt-ipset=y" >> .config
-        grep -q "CONFIG_PACKAGE_iptables-mod-tproxy=" .config || echo "CONFIG_PACKAGE_iptables-mod-tproxy=y" >> .config
         grep -q "CONFIG_PACKAGE_ipset=" .config || echo "CONFIG_PACKAGE_ipset=y" >> .config
 
     - name: Select custom plugin as module
