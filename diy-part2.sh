@@ -14,3 +14,9 @@ sed -i "/return table/i table.appendChild(E('tr', { 'class': 'tr' }, [E('td', { 
 
 # 使用清华源 (针对编译出的固件 opkg 软件源)
 sed -i 's/downloads.openwrt.org/mirrors.tuna.tsinghua.edu.cn\/openwrt/g' package/base-files/files/etc/opkg/distfeeds.conf
+
+# 修改 NTP 服务器
+sed -i 's/0.openwrt.pool.ntp.org/ntp.aliyun.com/g' package/base-files/files/etc/config/system
+sed -i 's/1.openwrt.pool.ntp.org/ntp.tencent.com/g' package/base-files/files/etc/config/system
+sed -i 's/2.openwrt.pool.ntp.org/pool.ntp.org/g' package/base-files/files/etc/config/system
+sed -i '/3.openwrt.pool.ntp.org/d' package/base-files/files/etc/config/system
