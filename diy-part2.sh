@@ -10,4 +10,7 @@
 # See /LICENSE for more information.
 # This script was created by yoier <https://github.com/yoier/r3s-firmware-build/blob/main/diy-part2.sh>
 nowDate=`TZ="UTC-8" date "+%Y-%m-%d %H:%M:%S"`
-sed -i "/return table/i table.appendChild(E('tr', { 'class': 'tr' }, [E('td', { 'class': 'td left', 'width': '33%' }, ['仓库地址 | 构建时间']),E('td', { 'class': 'td left' }, [E('a', { 'href': 'https://github.com/yoier/newifi3-firmware-build', 'target': '_blank' }, 'Powered by yoier/newifi3-firmware-build | $nowDate')])]));" feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+sed -i "/return table/i table.appendChild(E('tr', { 'class': 'tr' }, [E('td', { 'class': 'td left', 'width': '33%' }, ['仓库地址 | 构建时间']),E('td', { 'class': 'td left' }, [E('a', { 'href': 'https://github.com/Railgun-wiki/newifi3-firmware-build', 'target': '_blank' }, 'Powered by Railgun-wiki/newifi3-firmware-build | $nowDate')])]));" feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+
+# 使用清华源 (针对编译出的固件 opkg 软件源)
+sed -i 's/downloads.openwrt.org/mirrors.tuna.tsinghua.edu.cn\/openwrt/g' package/base-files/files/etc/opkg/distfeeds.conf
