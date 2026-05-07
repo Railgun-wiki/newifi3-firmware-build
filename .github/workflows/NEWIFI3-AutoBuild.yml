@@ -74,8 +74,6 @@ jobs:
     - name: Clone custom plugin
       run: |
         # 克隆 MiniEAP 相关包 (保留手动克隆以确保版本正确)
-        git clone https://github.com/kongfl888/luci-app-minieap openwrt/package/luci-app-minieap
-        git clone https://github.com/undefined443/openwrt-minieap-sysu openwrt/package/minieap-sysu
         
         # 如果手动输入了插件地址，依然保留克隆逻辑
         if [ "${{ github.event.inputs.plugin_source }}" != "" ]; then
