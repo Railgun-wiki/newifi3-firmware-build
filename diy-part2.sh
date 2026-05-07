@@ -20,3 +20,21 @@ sed -i 's/0.openwrt.pool.ntp.org/ntp.aliyun.com/g' package/base-files/files/etc/
 sed -i 's/1.openwrt.pool.ntp.org/ntp.tencent.com/g' package/base-files/files/etc/config/system
 sed -i 's/2.openwrt.pool.ntp.org/pool.ntp.org/g' package/base-files/files/etc/config/system
 sed -i '/3.openwrt.pool.ntp.org/d' package/base-files/files/etc/config/system
+
+# 强制开启所有核心组件和用户插件 (解决配置冲突)
+for pkg in kmod-tun kmod-ipt-tproxy kmod-netem kmod-ipt-ipset iptables-mod-tproxy ipset \
+           luci-app-minieap minieap luci-theme-argon ttyd curl wget-ssl ip-full \
+           libpcap tc-full conntrack luci-app-upnp miniupnpd kmod-ipt-nat iptables \
+           kmod-sched kmod-sched-core ca-bundle \
+           luci-i18n-upnp-zh-cn luci-i18n-ttyd-zh-cn \
+           kmod-fs-nfs kmod-fs-nfs-common kmod-fs-nfs-v3 kmod-fs-nfs-v4 \
+           kmod-usb-storage kmod-usb-storage-uas block-mount \
+           kmod-fs-ext4 kmod-fs-vfat kmod-fs-exfat kmod-fs-ntfs3 \
+           net-tools-ifconfig net-tools-route net-tools-netstat; do
+    sed -i "/CONFIG_PACKAGE_$pkg/d" .config
+    echo "CONFIG_PACKAGE_$pkg=y" >> .config
+done
+
+# 设置 Argon 为默认主题
+sed -i 's/CONFIG_PACKAGE_luci-theme-bootstrap=y/CONFIG_PACKAGE_luci-theme-bootstrap=n/g' .config
+echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
