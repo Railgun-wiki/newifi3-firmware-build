@@ -96,18 +96,40 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         
-        # 强制开启所有核心组件和用户插件 (解决配置冲突)
+        # 使用 sed 强制开启所有核心组件和用户插件 (解决配置冲突)
+        sed -i 's/# CONFIG_PACKAGE_kmod-tun is not set/CONFIG_PACKAGE_kmod-tun=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-ipt-tproxy is not set/CONFIG_PACKAGE_kmod-ipt-tproxy=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-netem is not set/CONFIG_PACKAGE_kmod-netem=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-ipt-ipset is not set/CONFIG_PACKAGE_kmod-ipt-ipset=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_iptables-mod-tproxy is not set/CONFIG_PACKAGE_iptables-mod-tproxy=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_ipset is not set/CONFIG_PACKAGE_ipset=y/g' .config
+        
+        # 开启 MiniEAP、主题、TTYD 和全量工具依赖
+        sed -i 's/# CONFIG_PACKAGE_luci-app-minieap is not set/CONFIG_PACKAGE_luci-app-minieap=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_minieap is not set/CONFIG_PACKAGE_minieap=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_luci-theme-argon is not set/CONFIG_PACKAGE_luci-theme-argon=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_ttyd is not set/CONFIG_PACKAGE_ttyd=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_curl is not set/CONFIG_PACKAGE_curl=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_wget-ssl is not set/CONFIG_PACKAGE_wget-ssl=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_ip-full is not set/CONFIG_PACKAGE_ip-full=y/g' .config
+        
+        # 补齐 leigod.sh 专用依赖包
+        sed -i 's/# CONFIG_PACKAGE_libpcap is not set/CONFIG_PACKAGE_libpcap=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_tc-full is not set/CONFIG_PACKAGE_tc-full=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_conntrack is not set/CONFIG_PACKAGE_conntrack=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_luci-app-upnp is not set/CONFIG_PACKAGE_luci-app-upnp=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_miniupnpd is not set/CONFIG_PACKAGE_miniupnpd=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_kmod-ipt-nat is not set/CONFIG_PACKAGE_kmod-ipt-nat=y/g' .config
+        sed -i 's/# CONFIG_PACKAGE_iptables is not set/CONFIG_PACKAGE_iptables=y/g' .config
+
+        # 兜底追加 (包含新增的 ca-bundle 和 kmod-sched)
         for pkg in kmod-tun kmod-ipt-tproxy kmod-netem kmod-ipt-ipset iptables-mod-tproxy ipset \
                    luci-app-minieap minieap luci-theme-argon ttyd curl wget-ssl ip-full \
                    libpcap tc-full conntrack luci-app-upnp miniupnpd kmod-ipt-nat iptables \
                    kmod-sched kmod-sched-core ca-bundle \
                    luci-i18n-upnp-zh-cn luci-i18n-ttyd-zh-cn \
-                   kmod-fs-nfs kmod-fs-nfs-common kmod-fs-nfs-v3 kmod-fs-nfs-v4 \
-                   kmod-usb-storage kmod-usb-storage-uas block-mount \
-                   kmod-fs-ext4 kmod-fs-vfat kmod-fs-exfat kmod-fs-ntfs3 \
                    net-tools-ifconfig net-tools-route net-tools-netstat; do
-            sed -i "/CONFIG_PACKAGE_$pkg/d" .config
-            echo "CONFIG_PACKAGE_$pkg=y" >> .config
+            grep -q "CONFIG_PACKAGE_$pkg=" .config || echo "CONFIG_PACKAGE_$pkg=y" >> .config
         done
         
         # 设置 Argon 为默认主题
@@ -121,113 +143,6 @@ jobs:
         # 寻找 package/custom_plugin 目录下的所有 Makefile 并提取包名
         find package/custom_plugin -name "Makefile" | while read m; do
           PKG=$(grep -E '^PKG_NAME:=' "$m" | cut -d'=' -f2 | tr -d ' \t\r\n')
-          # 处理可能存在的 $(NAME) 变量替换（简单兼容）
-          if [[ "$PKG" == *"\$(NAME)"* ]]; then
-            NAME=$(grep -E '^NAME:=' "$m" | cut -d'=' -f2 | tr -d ' \t\r\n')
-            PKG=${PKG//\$(NAME)/$NAME}
-          fi
-          if [ -n "$PKG" ]; then
-            echo "发现插件包: $PKG，已设为模块编译"
-            echo "CONFIG_PACKAGE_$PKG=m" >> .config
-          fi
-        done
-
-    - name: Download package
-      id: package
-      run: |
-        cd openwrt
-        make defconfig
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
-
-    - name: Compile the firmware
-      id: compile
-      run: |
-        cd openwrt
-        echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >> $GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
-
-    - name: Collect and Upload IPKs
-      if: steps.compile.outputs.status == 'success' && !cancelled()
-      run: |
-        mkdir -p custom_ipks
-        # 收集所有生成的 .ipk 文件 (包含插件及其依赖)
-        find openwrt/bin/ -name "*.ipk" -exec cp -f {} custom_ipks/ \;
-        echo "已收集的 IPK 列表:"
-        ls -l custom_ipks/
-
-    - name: Upload IPKs Artifact
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && !cancelled()
-      with:
-        name: OpenWrt_IPKs${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: custom_ipks/
-
-    - name: Check space usage
-      if: (!cancelled())
-      run: df -hT
-
-    - name: Upload bin directory
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
-
-    - name: Organize files
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: Upload firmware directory
-      uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
-      with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
-
-    - name: Generate release tag
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
-        touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: Upload firmware to release
-      uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
-
-    # - name: Delete workflow runs
-    #   uses: Mattraks/delete-workflow-runs@main
-    #   with:
-    #     retain_days: 0
-    #     keep_minimum_runs: 5
-
-    # - name: Remove old Releases
-    #   uses: dev-drprasad/delete-older-releases@master
-    #   if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-    #   with:
-    #     keep_latest: 5
-    #     delete_tags: true
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}=' -f2 | tr -d ' \t\r\n')
           # 处理可能存在的 $(NAME) 变量替换（简单兼容）
           if [[ "$PKG" == *"\$(NAME)"* ]]; then
             NAME=$(grep -E '^NAME:=' "$m" | cut -d'=' -f2 | tr -d ' \t\r\n')
